@@ -7,9 +7,10 @@ import { useState } from 'react'
 import { UploadVideosStep } from './UploadVideosStep'
 import { Video } from '@/hooks/useVideos'
 import { Mic2 } from 'lucide-react'
+import chalk from 'chalk'
 
 const defaultTranscriptionPrompt = [
-  'Esse vídeo faz parte de um curso sobre design de software utilizando Node.js e conceitos de Domain-Driven Design. Algumas tecnologias e termos mencionados no vídeo são: JavaScript, TypeScript, WatchedList, Vitest e Aggregates.',
+  process.env.NEXT_PUBLIC_DEFAULT_PROMPT,
 ].join('\n')
 
 // const defaultSummaryPrompt = [
@@ -47,12 +48,16 @@ export function MainForm() {
   async function handleGenerate(data: FormSchema) {
     setIsTranscribing(true)
 
-    await fetch('/api/ai/transcribe', {
-      method: 'POST',
-      body: JSON.stringify({
-        videoKeys: uploadedVideoKey,
-      }),
-    }).then((response) => response.json())
+    try {
+      await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({
+          videosId: Array.from(videos.keys()),
+        }),
+      })
+    } catch (error) {
+      console.log('Video Transcription Failure', error)
+    }
 
     setIsTranscribing(false)
   }

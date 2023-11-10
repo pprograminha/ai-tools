@@ -1,78 +1,94 @@
+import { r2 } from '@/lib/r2'
 import {
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
-import { NextResponse } from 'next/server'
-import FormData from 'form-data'
 import axios from 'axios'
 import chalk from 'chalk'
-import { r2 } from '@/lib/r2'
+import FormData from 'form-data'
+import { NextResponse } from 'next/server'
 
+type RequestData = {
+  videoId?: string
+  videosId?: string[]
+}
 export async function POST(request: Request) {
-  const { videoKey } = await request.json()
+  const data = await request.json()
+
+  const { videoId, videosId = [] } = data as RequestData
+
+  if (videoId) {
+    videosId.push(videoId)
+  }
 
   try {
-    console.log(chalk.yellow(`Retrieving audio from R2: ${videoKey}`))
+    const transcriptions = new Map<string, string>()
 
-    const videoAudio = await r2.send(
-      new GetObjectCommand({
-        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-        Key: videoKey,
-      }),
-    )
+    for (const videoId of videosId) {
+      console.log(chalk.yellow(`Retrieving audio from R2: ${videoId}`))
 
-    const formData = new FormData()
+      const videoAudio = await r2.send(
+        new GetObjectCommand({
+          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Key: `${videoId}.mp3`,
+        }),
+      )
 
-    formData.append('file', videoAudio.Body, {
-      contentType: videoAudio.ContentType,
-      knownLength: videoAudio.ContentLength,
-      filename: videoKey,
-    })
+      const formData = new FormData()
 
-    formData.append('model', 'whisper-1')
-    // formData.append('prompt', '')
-    formData.append('language', 'pt')
+      formData.append('file', videoAudio.Body, {
+        contentType: videoAudio.ContentType,
+        knownLength: videoAudio.ContentLength,
+        filename: `${videoId}.mp3`,
+      })
 
-    console.log(chalk.yellow(`Generating Transcription: ${videoKey}`))
+      formData.append('model', 'whisper-1')
+      // formData.append('prompt', '')
+      formData.append('language', 'pt')
 
-    const response = await axios.post(
-      'https://api.openai.com/v1/audio/transcriptions',
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-          ...formData.getHeaders(),
+      console.log(chalk.yellow(`Generating Transcription: ${videoId}`))
+
+      const response = await axios.post(
+        'https://api.openai.com/v1/audio/transcriptions',
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            ...formData.getHeaders(),
+          },
         },
-      },
-    )
+      )
 
-    console.log(chalk.yellow(`Deleting audio: ${videoKey}`))
+      console.log(chalk.yellow(`Deleting audio: ${videoId}`))
 
-    await r2.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-        Key: videoKey,
-      }),
-    )
+      await r2.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Key: `${videoId}.mp3`,
+        }),
+      )
 
-    const transcriptionKey = `${videoKey}.txt`
+      const transcriptionKey = `${videoId}.txt`
 
-    console.log(chalk.yellow(`Uploading Transcription: ${transcriptionKey}`))
+      console.log(chalk.yellow(`Uploading Transcription: ${transcriptionKey}`))
 
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-        Key: transcriptionKey,
-        Body: response.data.text,
-      }),
-    )
+      await r2.send(
+        new PutObjectCommand({
+          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Key: transcriptionKey,
+          Body: response.data.text,
+        }),
+      )
 
-    const { text } = response.data
+      const { text } = response.data
 
-    console.log(chalk.green(`Transcription succeeded!`))
+      transcriptions.set(videoId, text)
 
-    return NextResponse.json({ transcription: text })
+      console.log(chalk.green(`Transcription succeeded!`))
+    }
+
+    return NextResponse.json({ transcriptions })
   } catch (err) {
     console.log('error', err)
   }

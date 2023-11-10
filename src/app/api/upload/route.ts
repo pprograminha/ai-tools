@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       r2,
       new PutObjectCommand({
         Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
-        Key: `${videoId}.mp4`,
+        Key: `${videoId}.mp3`,
       }),
       { expiresIn: 60 },
     )

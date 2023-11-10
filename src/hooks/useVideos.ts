@@ -228,10 +228,10 @@ export function useVideos() {
       '20k',
       '-acodec',
       'libmp3lame',
-      `${id}.mp4`,
+      `${id}.mp3`,
     )
 
-    const data = ffmpeg.FS('readFile', `${id}.mp4`)
+    const data = ffmpeg.FS('readFile', `${id}.mp3`)
 
     const response = await fetch('/api/upload', {
       method: 'POST',
