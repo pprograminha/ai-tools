@@ -1,4 +1,4 @@
-import { Video } from '@/hooks/useVideos'
+import { Video } from '@/contexts/VideosContext'
 import { X } from 'lucide-react'
 
 interface VideoItemProps {
@@ -47,7 +47,7 @@ export function VideoItem({ id, video, onRemove }: VideoItemProps) {
       )} */}
 
       <span className="absolute bottom-0 left-0 right-0 rounded-b-md bg-black/40 p-1 text-center text-xs text-zinc-200">
-        {video.isLoading ? `${video.conversionProgress}%` : video.file.name}
+        {video.isLoading ? `${video.conversionProgress <= 0 ? 0 : video.conversionProgress}%` : video.file.name}
       </span>
     </div>
   )

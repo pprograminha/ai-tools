@@ -1,13 +1,17 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { useVideos } from '@/hooks/useVideos'
+import { getTranscriptions } from '@/lib/server'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { Download } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { useState } from 'react'
-import { UploadVideosStep } from './UploadVideosStep'
-import { Video } from '@/hooks/useVideos'
-import { Mic2 } from 'lucide-react'
-import chalk from 'chalk'
+import { UploadVideos } from './UploadVideos'
+import { Button } from './ui/button'
+import { ToastAction } from './ui/toast'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
+import { toast } from './ui/use-toast'
 
 const defaultTranscriptionPrompt = [
   process.env.NEXT_PUBLIC_DEFAULT_PROMPT,
@@ -25,81 +29,133 @@ const formSchema = z.object({
   transcriptionPrompt: z.string(),
 })
 
-type FormSchema = z.infer<typeof formSchema>
+export type AiToolsSchema = z.infer<typeof formSchema>
 
 export function MainForm() {
-  const [videos, setVideos] = useState<Map<string, Video>>(new Map())
   const [isTranscribing, setIsTranscribing] = useState(false)
-  const [step, setStep] = useState<'upload' | 'transcribe' | 'generate'>(
-    'upload',
+  const [transcriptions, setTranscriptions] = useState<Map<string, string>>(new Map())
+  const { videos, removeVideo, startAudioConversion } = useVideos()
+
+  const { register, handleSubmit, control, getValues } = useForm<AiToolsSchema>(
+    {
+      resolver: zodResolver(formSchema),
+      defaultValues: {
+        transcriptionPrompt: defaultTranscriptionPrompt,
+      },
+      mode: 'all',
+    },
   )
 
-  const {
-    register,
-    handleSubmit,
-    formState: { isSubmitting },
-  } = useForm<FormSchema>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      transcriptionPrompt: defaultTranscriptionPrompt,
-    },
-  })
+  useEffect(() => {
+    getTranscriptions().then((transcriptions) => {
+      setTranscriptions(transcriptions)
+    })
+  }, [])
 
-  async function handleGenerate(data: FormSchema) {
+  async function handleGenerate({
+    transcriptionPrompt
+  }: AiToolsSchema) {
     setIsTranscribing(true)
 
+    const videosId = Array.from(videos.keys())
+
     try {
-      await fetch('/api/ai/transcribe', {
-        method: 'POST',
-        body: JSON.stringify({
-          videosId: Array.from(videos.keys()),
-        }),
+      await startAudioConversion(videos)
+    } catch {
+      toast({
+        title: 'Erro ao tentar converter vídeo para aúdio!',
+        action: <ToastAction altText='Tente novamente'>Tente novamente</ToastAction>,
+        variant: 'destructive'
       })
-    } catch (error) {
-      console.log('Video Transcription Failure', error)
     }
 
-    setIsTranscribing(false)
+    try {
+      const response = await fetch('/api/ai/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({
+          transcriptionPrompt,
+          videosId,
+        }),
+      })
+
+      if(response.ok === false) {
+        throw new Error(JSON.stringify(response))
+      }
+      const transcriptions = await getTranscriptions()
+
+      setTranscriptions(transcriptions)
+      
+      toast({
+        title: 'Sucesso ao transcrever o vídeo',
+      })
+    } catch (error) {
+      toast({
+        title: 'Ocorreu um erro ao transcrever o vídeo!',
+        description: 'Verifique suas chaves de acesso',
+        variant: 'destructive'
+      })
+
+      console.log('Video Transcription Failure', error)
+    } finally {
+      setIsTranscribing(false)
+  
+      videosId.map(videoId => removeVideo(videoId))
+    }
   }
 
-  function handleUploaded(videos: Map<string, Video>) {
-    setVideos(videos)
-    setStep('transcribe')
+  const downloadTranscription = (blobname: string, transcription: string) => {
+    const transcriptionBlob = new Blob([transcription], {
+      type: 'plain/text'
+    })
+
+    const url = window.URL.createObjectURL(transcriptionBlob);
+
+    const link = document.createElement('a');
+
+    link.href = url;
+
+    link.download = blobname;
+    
+    link.click();
   }
 
   return (
     <form onSubmit={handleSubmit(handleGenerate)}>
-      {step === 'upload' && <UploadVideosStep onNextStep={handleUploaded} />}
-      {step === 'transcribe' && (
-        <div className="flex flex-col gap-2">
-          <label
-            className="text-sm font-semibold"
-            htmlFor="transcription_prompt"
-          >
-            Prompt de transcrição
-          </label>
-          <textarea
-            id="transcription_prompt"
-            defaultValue={defaultTranscriptionPrompt}
-            spellCheck={false}
-            className="min-h-[160px] w-full flex-1 rounded border border-zinc-200 px-4 py-3 leading-relaxed text-zinc-900"
-            {...register('transcriptionPrompt')}
-          />
-          <span className="text-xs text-zinc-500">
-            Adicione o contexto dos vídeos contendo palavras-chave sobre o
-            conteúdo apresentado.
-          </span>
+      <div className='flex gap-2 items-center flex-wrap my-2'>
+        {Array.from(transcriptions.entries()).map(([key, transcription]) => (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                  <Button size="icon" onClick={() => downloadTranscription(key, transcription)}>
+                    <Download />
+                  </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Baixar transcrição: {key}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ))}
+      </div>
 
-          <button
-            type="submit"
-            disabled={isTranscribing}
-            className="mt-2 inline-flex cursor-pointer items-center justify-center gap-2 rounded bg-sky-500 px-4 py-3 text-sm font-medium text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Mic2 className="h-4 w-4 text-white" />
-            Transcrever {videos.size} vídeos
-          </button>
-        </div>
-      )}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-semibold" htmlFor="transcription_prompt">
+          Prompt de transcrição
+        </label>
+        <textarea
+          id="transcription_prompt"
+          defaultValue={defaultTranscriptionPrompt}
+          spellCheck={false}
+          className="min-h-[160px] w-full flex-1 rounded border border-zinc-200 px-4 py-3 leading-relaxed text-zinc-900"
+          {...register('transcriptionPrompt')}
+        />
+        <span className="text-xs text-zinc-500">
+          Adicione o contexto dos vídeos contendo palavras-chave sobre o
+          conteúdo apresentado.
+        </span>
+
+        <UploadVideos isTranscribing={isTranscribing}  />
+      </div>
     </form>
   )
 }

@@ -12,11 +12,12 @@ import { NextResponse } from 'next/server'
 type RequestData = {
   videoId?: string
   videosId?: string[]
+  transcriptionPrompt: string
 }
 export async function POST(request: Request) {
   const data = await request.json()
 
-  const { videoId, videosId = [] } = data as RequestData
+  const { videoId, videosId = [], transcriptionPrompt } = data as RequestData
 
   if (videoId) {
     videosId.push(videoId)
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
   try {
     const transcriptions = new Map<string, string>()
-
+    
     for (const videoId of videosId) {
       console.log(chalk.yellow(`Retrieving audio from R2: ${videoId}`))
 
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
         }),
       )
 
+
       const formData = new FormData()
 
       formData.append('file', videoAudio.Body, {
@@ -44,7 +46,11 @@ export async function POST(request: Request) {
       })
 
       formData.append('model', 'whisper-1')
-      // formData.append('prompt', '')
+
+      if(transcriptionPrompt) {
+        formData.append('prompt', transcriptionPrompt)
+      }
+      
       formData.append('language', 'pt')
 
       console.log(chalk.yellow(`Generating Transcription: ${videoId}`))
@@ -67,6 +73,7 @@ export async function POST(request: Request) {
           Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
           Key: `${videoId}.mp3`,
         }),
+
       )
 
       const transcriptionKey = `${videoId}.txt`
@@ -83,13 +90,16 @@ export async function POST(request: Request) {
 
       const { text } = response.data
 
+
       transcriptions.set(videoId, text)
 
       console.log(chalk.green(`Transcription succeeded!`))
     }
 
-    return NextResponse.json({ transcriptions })
+    return NextResponse.json({ transcriptions: Array.from(transcriptions.entries()) })
   } catch (err) {
     console.log('error', err)
+
+    return NextResponse.error()
   }
 }
