@@ -47,11 +47,11 @@ export function MainForm() {
     },
   )
 
-  useEffect(() => {
-    getTranscriptions().then((transcriptions) => {
-      setTranscriptions(transcriptions)
-    })
-  }, [])
+  // useEffect(() => {
+  //   getTranscriptions().then((transcriptions) => {
+  //     setTranscriptions(transcriptions)
+  //   })
+  // }, [])
 
   async function handleGenerate({
     transcriptionPrompt
@@ -82,9 +82,9 @@ export function MainForm() {
       if(response.ok === false) {
         throw new Error(JSON.stringify(response))
       }
-      const transcriptions = await getTranscriptions()
+      // const transcriptions = await getTranscriptions()
 
-      setTranscriptions(transcriptions)
+      // setTranscriptions(transcriptions)
       
       toast({
         title: 'Sucesso ao transcrever o vídeo',
