@@ -108,7 +108,7 @@ export async function POST(request: Request) {
       console.log(chalk.green(`Transcription succeeded!`))
     }
 
-    return NextResponse.json({ transcriptions: Array.from(transcriptions.entries()) })
+    return NextResponse.json({ ok: 1 })
   } catch (error) {
     console.log('error', error)
 
