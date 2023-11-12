@@ -5,7 +5,7 @@ import {
   GetObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3'
-import axios from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import chalk from 'chalk'
 import FormData from 'form-data'
 import { NextResponse } from 'next/server'
@@ -56,16 +56,27 @@ export async function POST(request: Request) {
 
       console.log(chalk.yellow(`Generating Transcription: ${videoId}`))
 
-      const response = await axios.post(
-        'https://api.openai.com/v1/audio/transcriptions',
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-            ...formData.getHeaders(),
+      let response: AxiosResponse<{ text: string }>
+
+      try {
+        response = await axios.post(
+          'https://api.openai.com/v1/audio/transcriptions',
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+              ...formData.getHeaders(),
+            },
           },
-        },
-      )
+        )
+
+      } catch (error) {
+        return NextResponse.json({
+          error: JSON.stringify(error, Object.getOwnPropertyNames(error))
+        }, {
+          status: 400
+        })
+      }
 
       console.log(chalk.yellow(`Deleting audio: ${videoId}`))
 
@@ -98,9 +109,13 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ transcriptions: Array.from(transcriptions.entries()) })
-  } catch (err) {
-    console.log('error', err)
+  } catch (error) {
+    console.log('error', error)
 
-    return NextResponse.error()
+    return NextResponse.json({
+      error: JSON.stringify(error, Object.getOwnPropertyNames(error))
+    }, {
+      status: 500
+    })
   }
 }
