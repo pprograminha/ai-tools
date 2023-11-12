@@ -1,3 +1,4 @@
+import { env } from '@/app/env'
 import { r2 } from '@/lib/r2'
 import { PutObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
     const signedUrl = await getSignedUrl(
       r2,
       new PutObjectCommand({
-        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+        Bucket: env.CLOUDFLARE_BUCKET_NAME,
         Key: `${videoId}.mp3`,
       }),
       { expiresIn: 60 },

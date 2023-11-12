@@ -1,6 +1,6 @@
 import { env } from '@/app/env'
 import { r2 } from '@/lib/r2'
-import { redis, redisVectorStore } from '@/lib/redis'
+import { redis } from '@/lib/redis'
 import { ListObjectsCommand } from '@aws-sdk/client-s3'
 import { Document } from 'langchain/dist/document'
 import { S3Loader } from 'langchain/document_loaders/web/s3'
@@ -8,13 +8,12 @@ import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
 import { TokenTextSplitter } from 'langchain/text_splitter'
 import { RedisVectorStore } from 'langchain/vectorstores/redis'
 import { NextResponse } from 'next/server'
-import { createClient } from 'redis'
 
 
 export async function POST(request: Request) {
     const objects = await r2.send(
         new ListObjectsCommand({
-          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Bucket: env.CLOUDFLARE_BUCKET_NAME,
         }),
       )
     

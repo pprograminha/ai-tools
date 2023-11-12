@@ -1,6 +1,7 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3'
 import chalk from 'chalk'
 import { r2 } from '@/lib/r2'
+import { env } from '@/app/env'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
 
     const transcription = await r2.send(
       new GetObjectCommand({
-        Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+        Bucket: env.CLOUDFLARE_BUCKET_NAME,
         Key: transcriptionKey,
       }),
     )

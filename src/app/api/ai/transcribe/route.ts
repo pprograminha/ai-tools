@@ -1,3 +1,4 @@
+import { env } from '@/app/env'
 import { r2 } from '@/lib/r2'
 import {
   DeleteObjectCommand,
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
       const videoAudio = await r2.send(
         new GetObjectCommand({
-          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Bucket: env.CLOUDFLARE_BUCKET_NAME,
           Key: `${videoId}.mp3`,
         }),
       )
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
         formData,
         {
           headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            Authorization: `Bearer ${env.OPENAI_API_KEY}`,
             ...formData.getHeaders(),
           },
         },
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
 
       await r2.send(
         new DeleteObjectCommand({
-          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Bucket: env.CLOUDFLARE_BUCKET_NAME,
           Key: `${videoId}.mp3`,
         }),
 
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
 
       await r2.send(
         new PutObjectCommand({
-          Bucket: process.env.CLOUDFLARE_BUCKET_NAME,
+          Bucket: env.CLOUDFLARE_BUCKET_NAME,
           Key: transcriptionKey,
           Body: response.data.text,
         }),

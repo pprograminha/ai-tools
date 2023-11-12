@@ -12,9 +12,10 @@ import { Button } from './ui/button'
 import { ToastAction } from './ui/toast'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip'
 import { toast } from './ui/use-toast'
+import { env } from '@/app/env'
 
 const defaultTranscriptionPrompt = [
-  process.env.NEXT_PUBLIC_DEFAULT_PROMPT,
+  env.NEXT_PUBLIC_DEFAULT_PROMPT,
 ].join('\n')
 
 // const defaultSummaryPrompt = [
