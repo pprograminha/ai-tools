@@ -1,5 +1,6 @@
 import { env } from '@/app/env'
 import { r2 } from '@/lib/r2'
+import { loader } from '@/server/loader'
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -106,6 +107,8 @@ export async function POST(request: Request) {
       transcriptions.set(videoId, text)
 
       console.log(chalk.green(`Transcription succeeded!`))
+
+      await loader(`${videoId}.txt`)
     }
 
     return NextResponse.json({ ok: 1 })

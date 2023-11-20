@@ -1,71 +1,29 @@
 import { env } from '@/app/env'
 import { r2 } from '@/lib/r2'
-import { redis } from '@/lib/redis'
+import { loader } from '@/server/loader'
 import { ListObjectsCommand } from '@aws-sdk/client-s3'
-import { Document } from 'langchain/dist/document'
-import { S3Loader } from 'langchain/document_loaders/web/s3'
-import { OpenAIEmbeddings } from 'langchain/embeddings/openai'
-import { TokenTextSplitter } from 'langchain/text_splitter'
-import { RedisVectorStore } from 'langchain/vectorstores/redis'
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 
 export async function POST(request: Request) {
-    const objects = await r2.send(
-        new ListObjectsCommand({
-          Bucket: env.CLOUDFLARE_BUCKET_NAME,
-        }),
-      )
-    
-    const keys = objects.Contents?.map(content => content.Key).filter(k => k) as string[] || []
+    const { keys: $keys } = await request.json()
 
+    const parsedKeys = z.array(z.string()).optional().default([]).parse($keys)
 
-    const documents: Document<Record<string, string>>[] = []
+    let keys = parsedKeys
 
-    for (const key of keys) {
-        const loader = new S3Loader({
-            unstructuredAPIURL: `${env.NEXT_PUBLIC_APP_URL}/api/ai/loader/text`,
-            unstructuredAPIKey: '',
-
-            bucket: env.CLOUDFLARE_BUCKET_NAME,
-            key,
-            
-            s3Config: {
-                region: 'auto',
-                endpoint: `https://${env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-                credentials: {
-                  accessKeyId: env.CLOUDFLARE_ACCESS_KEY,
-                  secretAccessKey: env.CLOUDFLARE_SECRET_KEY,
-                },
-            }
-            
-        })
+    if(parsedKeys.length === 0) {
+        const objects = await r2.send(
+            new ListObjectsCommand({
+              Bucket: env.CLOUDFLARE_BUCKET_NAME,
+            }),
+        )
         
-        const docs = await loader.load()
-
-        documents.push(docs[0])
+        keys = objects.Contents?.map(content => content.Key).filter(k => k) as string[] || []
     }
 
-    const splitter = new TokenTextSplitter({
-        encodingName: 'cl100k_base',
-        chunkSize: 600,
-        chunkOverlap: 0,
-    })
-
-    const splittedDocuments = await splitter.splitDocuments(documents)
-
-    redis.connect()
-
-    await RedisVectorStore.fromDocuments(splittedDocuments, new OpenAIEmbeddings({
-        openAIApiKey: env.OPENAI_API_KEY,
-    }), {
-        indexName: 'lesson-embeddings',
-        redisClient: redis,
-        keyPrefix: 'lessons:'
-    })
-
-
-    await redis.disconnect()
+    const splittedDocuments = await loader(keys)
 
     return NextResponse.json({
         splittedDocuments

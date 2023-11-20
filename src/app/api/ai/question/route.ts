@@ -34,6 +34,11 @@ export async function POST(request: Request) {
     })
     
     console.log(chalk.yellow(`Calling chain`))
+    console.log(chalk.yellow(`Chain Params: `, Object.entries({
+        OPENAI_API_KEY: env.OPENAI_API_KEY,
+        template: template.trim(),
+        question,
+    })))
     const response = await chain.call({
         query: question
     })
